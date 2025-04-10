@@ -1,8 +1,8 @@
-import { BrandTool, Service } from '../dto/brandKitResponseDto';
+import { Tool, Service } from '../dto/brandKitResponseDto';
 
 interface PromptOptions {
   existingServices: Service[];
-  existingTools: BrandTool[];
+  existingTools: Tool[];
   serviceType: string;
 }
 

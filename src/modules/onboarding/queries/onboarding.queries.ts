@@ -51,28 +51,6 @@ export const UPDATE_ONBOARDING_ROW = `
   WHERE user_id = $1
 `;
 
-// export const SELECT_ONBOARDING_BY_USER = `
-//   SELECT
-//     user_id,
-//     current_step,
-//     service_type,
-//     location,
-//     readiness_level,
-//     business_name_suggestions,
-//     selected_business_name,
-//     brand_color_options,
-//     selected_color_palette,
-//     logo_style_options,
-//     selected_logo_style,
-//     selected_logo_id,
-//     services,
-//     tools,
-//     slogan
-//   FROM onboarding
-//   WHERE user_id = $1
-//   LIMIT 1
-// `;
-
 export const SELECT_ONBOARDING_BY_USER = `
   SELECT * FROM onboarding WHERE user_id = $1
 `;

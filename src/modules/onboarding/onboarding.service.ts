@@ -6,20 +6,14 @@ import {
 } from '@nestjs/common';
 import { SaveOnboardingDto } from './dto/save-onboarding.dto';
 import { DatabaseService } from 'src/common/database/database.service';
-import { FetchOnboardingDto } from './dto/fetchOnboardingDto';
 import { GetOnboardingResponseDto } from './dto/getOnboardingResponseDto';
 import {
   INSERT_ONBOARDING_ROW,
-  MARK_ONBOARDING_COMPLETE,
   SELECT_ONBOARDING_BY_USER,
   UPDATE_ONBOARDING_ROW,
   UPDATE_PROFILE_ONBOARDING_STATUS,
 } from './queries/onboarding.queries';
-import {
-  BrandKitResponseDto,
-  BrandTool,
-  Service,
-} from './dto/brandKitResponseDto';
+import { BrandKitResponseDto, Service, Tool } from './dto/brandKitResponseDto';
 import { getCurrentOnboardingStatus } from './utils/getCurrentOnboardingStatus';
 import {
   fetchBrandKitByUserId,
@@ -29,22 +23,22 @@ import {
 } from './utils/helpers';
 import { tagServicesWithSource } from './utils/tagWithSource';
 import { OpenAIService } from 'src/common/openai/openai.service';
-import { parseServiceAndToolResponse } from './parsers/parseServiceAndToolResponse';
-import { buildServiceAndToolPrompt } from './prompts/brand-services-tools.prompt';
 import {
   filterBrandKitByAccess,
   normalizeUserServices,
 } from './utils/brand-kit.utils';
-import {
-  INSERT_BRAND_KIT,
-  SELECT_BRAND_KIT_BY_USER_ID,
-} from './queries/brand-kit.queries';
+import { SELECT_BRAND_KIT_BY_USER_ID } from './queries/brand-kit.queries';
+import { OnboardingHelperService } from './utils/generate-brand-kit/onboardingHelper.service';
+import { generateSuggestedServicesAndTools } from './utils/generate-brand-kit/generateSuggestedServicesAndTools';
+import { buildBrandKit } from './utils/generate-brand-kit/buildBrandKit';
+import { maybeMarkOnboardingComplete } from './utils/generate-brand-kit/maybeMarkOnboardingComplete';
 
 @Injectable()
 export class OnboardingService {
   constructor(
     private readonly db: DatabaseService,
     private readonly openaiService: OpenAIService,
+    private readonly onboardingHelper: OnboardingHelperService,
   ) {}
 
   async saveProgress(userId: string, data: SaveOnboardingDto): Promise<void> {
@@ -286,112 +280,196 @@ export class OnboardingService {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
-  async generateBrandKit(userId: string): Promise<BrandKitResponseDto> {
-    const rows = await this.db.query<FetchOnboardingDto>(
-      SELECT_ONBOARDING_BY_USER,
-      [userId],
-    );
-    if (!rows.length) {
-      console.warn('❌ No onboarding data found for user:', userId);
-      throw new NotFoundException('Onboarding data not found');
-    }
+  // async generateBrandKit(userId: string): Promise<BrandKitResponseDto> {
+  //   const rows = await this.db.query<FetchOnboardingDto>(
+  //     SELECT_ONBOARDING_BY_USER,
+  //     [userId],
+  //   );
+  //   if (!rows.length) {
+  //     console.warn('❌ No onboarding data found for user:', userId);
+  //     throw new NotFoundException('Onboarding data not found');
+  //   }
 
-    const onboarding = rows[0];
-    console.log('🧾 Onboarding row fetched ✅');
+  //   const onboarding = rows[0];
+  //   console.log('🧾 Onboarding row fetched ✅');
+
+  //   const userServices = normalizeUserServices(onboarding.services);
+  //   const userTools = normalizeUserTools(onboarding.tools);
+
+  //   console.log(
+  //     `🧪 Found ${userServices.length} user service(s):`,
+  //     userServices,
+  //   );
+  //   console.log(`🧪 Found ${userTools.length} user tool(s):`, userTools);
+
+  //   const needsServices = userServices.length < 6;
+  //   const needsTools = userTools.length < 8;
+
+  //   let aiServices: Service[] = [];
+  //   let aiTools: BrandTool[] = [];
+
+  //   if (needsServices || needsTools) {
+  //     const prompt = buildServiceAndToolPrompt({
+  //       existingServices: userServices,
+  //       existingTools: userTools,
+  //       serviceType: onboarding.service_type || 'service',
+  //     });
+
+  //     console.log('🧠 Generated AI prompt:\n', prompt);
+
+  //     try {
+  //       const raw = await this.openaiService.generateCompletion(prompt);
+  //       const parsed = parseServiceAndToolResponse(raw);
+
+  //       const userServiceNames = new Set(
+  //         userServices.map((s) => s.name.toLowerCase()),
+  //       );
+  //       aiServices = parsed.services.filter(
+  //         (s) => !userServiceNames.has(s.name.toLowerCase()),
+  //       );
+
+  //       const userToolNames = new Set(
+  //         userTools.map((t) => t.name.toLowerCase()),
+  //       );
+  //       aiTools = parsed.tools.filter(
+  //         (t) => !userToolNames.has(t.name.toLowerCase()),
+  //       );
+
+  //       console.log('🤖 AI services (filtered):', aiServices);
+  //       console.log('🤖 AI tools (filtered):', aiTools);
+  //     } catch (error) {
+  //       console.error('❌ Failed to generate AI brand kit suggestions:', error);
+  //     }
+  //   }
+
+  //   const brandKit: BrandKitResponseDto = {
+  //     logo_url: onboarding.selected_logo_id || '',
+  //     business_name: onboarding.selected_business_name || 'My Business',
+  //     slogan: onboarding.slogan || 'Your go-to local service!',
+  //     brand_colors: onboarding.selected_color_palette || [],
+  //     services: [...userServices, ...aiServices],
+  //     tools: [...userTools, ...aiTools],
+  //     service_type: onboarding.service_type || '',
+  //     location: onboarding.location || '',
+  //     is_paid: false, // 🔒 this will be used in the filter logic
+  //   };
+
+  //   console.log('💾 Saving brand kit to database...');
+  //   await this.db.query(INSERT_BRAND_KIT, [
+  //     userId,
+  //     brandKit.logo_url,
+  //     brandKit.business_name,
+  //     brandKit.slogan,
+  //     brandKit.service_type,
+  //     brandKit.location,
+  //     JSON.stringify(brandKit.brand_colors),
+  //     JSON.stringify(brandKit.services),
+  //     JSON.stringify(brandKit.tools),
+  //     brandKit.is_paid,
+  //   ]);
+  //   console.log('✅ Brand kit saved.');
+
+  //   if (onboarding.current_step === 7) {
+  //     await this.db.query(MARK_ONBOARDING_COMPLETE, [userId]);
+  //     console.log('✅ Onboarding marked as complete.');
+  //   }
+
+  //   const filteredKit = filterBrandKitByAccess(brandKit);
+  //   console.log(
+  //     filteredKit.is_paid
+  //       ? '✅ Returning full brand kit (paid user)'
+  //       : '🔒 Returning locked preview brand kit (unpaid user)',
+  //   );
+
+  //   return filteredKit;
+  // }
+
+  async generateBrandKit(userId: string): Promise<BrandKitResponseDto> {
+    const onboarding = await this.onboardingHelper.fetchOnboardingData(userId);
 
     const userServices = normalizeUserServices(onboarding.services);
     const userTools = normalizeUserTools(onboarding.tools);
 
-    console.log(
-      `🧪 Found ${userServices.length} user service(s):`,
+    const needsSuggestions = userServices.length < 6 || userTools.length < 8;
+
+    const { suggestedServices, suggestedTools } = needsSuggestions
+      ? await generateSuggestedServicesAndTools({
+          serviceType: onboarding.service_type || '',
+          existingServices: userServices,
+          existingTools: userTools,
+          openaiService: this.openaiService,
+        })
+      : { suggestedServices: [], suggestedTools: [] };
+
+    const brandKit = buildBrandKit({
+      onboarding,
       userServices,
-    );
-    console.log(`🧪 Found ${userTools.length} user tool(s):`, userTools);
+      userTools,
+      suggestedServices,
+      suggestedTools,
+    });
 
-    const needsServices = userServices.length < 6;
-    const needsTools = userTools.length < 8;
+    await this.onboardingHelper.saveBrandKitToDB(userId, brandKit);
+    await maybeMarkOnboardingComplete(userId, onboarding.current_step, this.db);
 
-    let aiServices: Service[] = [];
-    let aiTools: BrandTool[] = [];
-
-    if (needsServices || needsTools) {
-      const prompt = buildServiceAndToolPrompt({
-        existingServices: userServices,
-        existingTools: userTools,
-        serviceType: onboarding.service_type || 'service',
-      });
-
-      console.log('🧠 Generated AI prompt:\n', prompt);
-
-      try {
-        const raw = await this.openaiService.generateCompletion(prompt);
-        const parsed = parseServiceAndToolResponse(raw);
-
-        const userServiceNames = new Set(
-          userServices.map((s) => s.name.toLowerCase()),
-        );
-        aiServices = parsed.services.filter(
-          (s) => !userServiceNames.has(s.name.toLowerCase()),
-        );
-
-        const userToolNames = new Set(
-          userTools.map((t) => t.name.toLowerCase()),
-        );
-        aiTools = parsed.tools.filter(
-          (t) => !userToolNames.has(t.name.toLowerCase()),
-        );
-
-        console.log('🤖 AI services (filtered):', aiServices);
-        console.log('🤖 AI tools (filtered):', aiTools);
-      } catch (error) {
-        console.error('❌ Failed to generate AI brand kit suggestions:', error);
-      }
-    }
-
-    const brandKit: BrandKitResponseDto = {
-      logo_url: onboarding.selected_logo_id || '',
-      business_name: onboarding.selected_business_name || 'My Business',
-      slogan: onboarding.slogan || 'Your go-to local service!',
-      brand_colors: onboarding.selected_color_palette || [],
-      services: [...userServices, ...aiServices],
-      tools: [...userTools, ...aiTools],
-      service_type: onboarding.service_type || '',
-      location: onboarding.location || '',
-      is_paid: false, // 🔒 this will be used in the filter logic
-    };
-
-    console.log('💾 Saving brand kit to database...');
-    await this.db.query(INSERT_BRAND_KIT, [
-      userId,
-      brandKit.logo_url,
-      brandKit.business_name,
-      brandKit.slogan,
-      brandKit.service_type,
-      brandKit.location,
-      JSON.stringify(brandKit.brand_colors),
-      JSON.stringify(brandKit.services),
-      JSON.stringify(brandKit.tools),
-      brandKit.is_paid,
-    ]);
-    console.log('✅ Brand kit saved.');
-
-    if (onboarding.current_step === 7) {
-      await this.db.query(MARK_ONBOARDING_COMPLETE, [userId]);
-      console.log('✅ Onboarding marked as complete.');
-    }
-
-    const filteredKit = filterBrandKitByAccess(brandKit);
-    console.log(
-      filteredKit.is_paid
-        ? '✅ Returning full brand kit (paid user)'
-        : '🔒 Returning locked preview brand kit (unpaid user)',
-    );
-
-    return filteredKit;
+    return filterBrandKitByAccess(brandKit);
   }
 
-  async getBrandKitByUserId(userId: string): Promise<BrandKitResponseDto> {
-    const result = await this.db.query<BrandKitResponseDto>(
+  // async getBrandKitByUserId(userId: string): Promise<BrandKitResponseDto> {
+  //   const result = await this.db.query<BrandKitResponseDto>(
+  //     SELECT_BRAND_KIT_BY_USER_ID,
+  //     [userId],
+  //   );
+
+  //   if (!result.length) {
+  //     throw new NotFoundException('Brand kit not found');
+  //   }
+
+  //   const rawKit = result[0];
+  //   console.log('🧾 Raw brand kit from DB:', rawKit);
+
+  //   const parsedServices: Service[] = rawKit.services || [];
+
+  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  //   const parsedTools: BrandTool[] = (rawKit.tools || []).map((tool: any) => {
+  //     if (typeof tool.name === 'object') {
+  //       return {
+  //         name: tool.name.name,
+  //         source: tool.name.source,
+  //         checked: tool.name.checked,
+  //       };
+  //     }
+  //     return {
+  //       name: tool.name,
+  //       source: tool.source,
+  //       checked: tool.checked,
+  //     };
+  //   });
+
+  //   const fullKit: BrandKitResponseDto = {
+  //     ...rawKit,
+  //     brand_colors: rawKit.brand_colors || [],
+  //     services: parsedServices,
+  //     tools: parsedTools,
+  //     logo_url: rawKit.logo_url,
+  //   };
+
+  //   const finalKit = filterBrandKitByAccess(fullKit);
+
+  //   console.log(
+  //     finalKit.is_paid
+  //       ? '✅ Returning full brand kit (paid user)'
+  //       : '🔒 Returning locked preview brand kit (unpaid user)',
+  //   );
+
+  //   return finalKit;
+  // }
+
+  async getBrandKitByUserId(
+    userId: string,
+    db: DatabaseService,
+  ): Promise<BrandKitResponseDto> {
+    const result = await db.query<BrandKitResponseDto>(
       SELECT_BRAND_KIT_BY_USER_ID,
       [userId],
     );
@@ -400,33 +478,36 @@ export class OnboardingService {
       throw new NotFoundException('Brand kit not found');
     }
 
-    const rawKit = result[0];
-    console.log('🧾 Raw brand kit from DB:', rawKit);
+    const raw = result[0];
 
-    const parsedServices: Service[] = rawKit.services || [];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsedTools: BrandTool[] = (rawKit.tools || []).map((tool: any) => {
-      if (typeof tool.name === 'object') {
-        return {
-          name: tool.name.name,
-          source: tool.name.source,
-          checked: tool.name.checked,
-        };
-      }
-      return {
+    const parseTools = (tools: Tool[]): Tool[] =>
+      (tools || []).map((tool) => ({
+        id: tool.id ?? '',
         name: tool.name,
-        source: tool.source,
-        checked: tool.checked,
-      };
-    });
+        checked: tool.checked ?? true,
+      }));
+
+    const parseServices = (services: Service[]): Service[] =>
+      (services || []).map((svc) => ({
+        id: svc.id ?? '',
+        name: svc.name,
+        price: svc.price,
+      }));
 
     const fullKit: BrandKitResponseDto = {
-      ...rawKit,
-      brand_colors: rawKit.brand_colors || [],
-      services: parsedServices,
-      tools: parsedTools,
-      logo_url: rawKit.logo_url,
+      logo_url: raw.logo_url,
+      business_name: raw.business_name,
+      slogan: raw.slogan,
+      service_type: raw.service_type,
+      location: raw.location,
+      brand_colors: raw.brand_colors || [],
+
+      user_services: parseServices(raw.user_services || []),
+      suggested_services: parseServices(raw.suggested_services || []),
+      user_tools: parseTools(raw.user_tools || []),
+      suggested_tools: parseTools(raw.suggested_tools || []),
+
+      is_paid: raw.is_paid,
     };
 
     const finalKit = filterBrandKitByAccess(fullKit);

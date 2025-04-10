@@ -7,11 +7,7 @@ import {
 } from '../queries/onboarding.queries';
 import { FetchOnboardingDto } from '../dto/fetchOnboardingDto';
 import { GetOnboardingResponseDto } from '../dto/getOnboardingResponseDto';
-import {
-  BrandKitResponseDto,
-  BrandTool,
-  Service,
-} from '../dto/brandKitResponseDto';
+import { BrandKitResponseDto, Tool, Service } from '../dto/brandKitResponseDto';
 import { filterBrandKitByAccess } from './brand-kit.utils';
 
 export async function fetchProfileStatus(
@@ -42,16 +38,14 @@ export async function fetchOnboardingProgress(
   ]);
 
   if (!result.length) {
-    return {
-      current_step: 1,
-    };
+    return { current_step: 1 };
   }
 
   const {
     current_step,
     service_type,
     location,
-    readiness_level, // ✅ changed from user_tools
+    readiness_level,
     business_name_suggestions,
     selected_business_name,
     brand_color_options,
@@ -68,7 +62,7 @@ export async function fetchOnboardingProgress(
     current_step,
     service_type,
     location,
-    readiness_level, // ✅ changed from user_tools
+    readiness_level,
     business_name_suggestions,
     selected_business_name,
     brand_color_options,
@@ -97,41 +91,43 @@ export async function fetchBrandKitByUserId(
 
   const rawKit = result[0];
 
-  // ✅ Parse services
-  const parsedServices: Service[] = JSON.parse(
-    JSON.stringify(rawKit.services || []),
-  );
-
-  // ✅ Parse tools safely
-  const parsedTools: BrandTool[] = (rawKit.tools || []).map((tool: any) => {
-    if (typeof tool.name === 'object') {
-      return {
-        name: tool.name.name,
-        source: tool.name.source,
-        checked: tool.name.checked,
-      };
+  const parseArray = <T>(raw: unknown): T[] => {
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed as T[];
+        }
+        return [];
+      } catch (e) {
+        console.warn('Failed to parse JSON array:', e);
+        return [];
+      }
     }
-    return {
-      name: tool.name,
-      source: tool.source || 'user',
-      checked: tool.checked ?? false,
-    };
-  });
+
+    if (Array.isArray(raw)) {
+      return raw as T[];
+    }
+
+    return [];
+  };
 
   const fullKit: BrandKitResponseDto = {
     ...rawKit,
     brand_colors: rawKit.brand_colors || [],
-    services: parsedServices,
-    tools: parsedTools,
+    user_services: parseArray<Service>(rawKit.user_services),
+    suggested_services: parseArray<Service>(rawKit.suggested_services),
+    user_tools: parseArray<Tool>(rawKit.user_tools),
+    suggested_tools: parseArray<Tool>(rawKit.suggested_tools),
     logo_url: rawKit.logo_url,
   };
 
   return filterBrandKitByAccess(fullKit);
 }
 
-export function normalizeUserTools(tools?: unknown[]): BrandTool[] {
+export function normalizeUserTools(tools?: unknown[]): Tool[] {
   return (tools || []).map((tool) => {
-    // If it's already a valid object, pass through
     if (
       typeof tool === 'object' &&
       tool !== null &&
@@ -139,16 +135,15 @@ export function normalizeUserTools(tools?: unknown[]): BrandTool[] {
       typeof (tool as any).name === 'string'
     ) {
       return {
+        id: (tool as any).id || crypto.randomUUID(),
         name: (tool as any).name,
-        source: (tool as any).source ?? 'user',
         checked: (tool as any).checked ?? true,
       };
     }
 
-    // Otherwise, assume it's a string and wrap
     return {
+      id: crypto.randomUUID(),
       name: String(tool),
-      source: 'user',
       checked: true,
     };
   });

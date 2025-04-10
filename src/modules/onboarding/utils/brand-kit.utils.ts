@@ -1,58 +1,60 @@
-import {
-  BrandKitResponseDto,
-  BrandTool,
-  Service,
-} from '../dto/brandKitResponseDto';
+// src/features/brandKit/helpers/normalizeAndFilter.ts
+
+import { BrandKitResponseDto, Tool, Service } from '../dto/brandKitResponseDto';
 
 /**
- * Ensures output is a clean array of `Service` with source = 'user'
+ * Ensures output is a clean array of `Service`
  */
 export function normalizeUserServices(raw: unknown): Service[] {
   if (!Array.isArray(raw)) return [];
 
   return raw
     .filter(
-      (item): item is { name: string; price: number } =>
+      (item): item is { id?: string; name: string; price: number } =>
         typeof item?.name === 'string' && typeof item?.price === 'number',
     )
     .map((svc) => ({
-      ...svc,
-      source: 'user',
+      id: svc.id ?? crypto.randomUUID(),
+      name: svc.name,
+      price: svc.price,
     }));
 }
 
 /**
- * Ensures output is a clean array of `BrandTool` with source = 'user'
+ * Ensures output is a clean array of `Tool`
  */
-export function normalizeUserTools(raw: unknown): BrandTool[] {
+export function normalizeUserTools(raw: unknown): Tool[] {
   if (!Array.isArray(raw)) return [];
 
   return raw
-    .map((tool): BrandTool | null => {
-      if (typeof tool === 'string') {
-        return { name: tool, source: 'user', checked: true };
-      }
+    .map(
+      (
+        tool: { id?: string; name: string; checked?: boolean } | string,
+      ): Tool | null => {
+        if (typeof tool === 'string') {
+          return {
+            id: crypto.randomUUID(),
+            name: tool,
+            checked: true,
+          };
+        }
 
-      if (
-        typeof tool === 'object' &&
-        tool !== null &&
-        typeof tool.name === 'string'
-      ) {
-        const source: 'user' | 'ai' = tool.source === 'ai' ? 'ai' : 'user';
+        if (
+          typeof tool === 'object' &&
+          tool !== null &&
+          typeof tool.name === 'string'
+        ) {
+          return {
+            id: tool.id ?? crypto.randomUUID(),
+            name: tool.name,
+            checked: typeof tool.checked === 'boolean' ? tool.checked : true,
+          };
+        }
 
-        const checked: boolean =
-          typeof tool.checked === 'boolean' ? tool.checked : true;
-
-        return {
-          name: tool.name,
-          source,
-          checked,
-        };
-      }
-
-      return null;
-    })
-    .filter((t): t is BrandTool => t !== null);
+        return null;
+      },
+    )
+    .filter((t): t is Tool => t !== null);
 }
 
 /**
@@ -63,19 +65,9 @@ export function filterBrandKitByAccess(
 ): BrandKitResponseDto {
   if (kit.is_paid) return kit;
 
-  const limitedServices: Service[] = [
-    ...kit.services.filter((s) => s.source === 'user'),
-    ...kit.services.filter((s) => s.source === 'ai').slice(0, 1),
-  ];
-
-  const limitedTools: BrandTool[] = [
-    ...kit.tools.filter((t) => t.source === 'user'),
-    ...kit.tools.filter((t) => t.source === 'ai').slice(0, 2),
-  ];
-
   return {
     ...kit,
-    services: limitedServices,
-    tools: limitedTools,
+    suggested_services: kit.suggested_services.slice(0, 1),
+    suggested_tools: kit.suggested_tools.slice(0, 2),
   };
 }

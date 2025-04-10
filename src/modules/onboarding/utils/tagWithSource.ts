@@ -6,7 +6,6 @@ import {
 } from '../queries/onboarding.queries';
 import { FetchOnboardingDto } from '../dto/fetchOnboardingDto';
 import { GetOnboardingResponseDto } from '../dto/getOnboardingResponseDto';
-import { BrandKitResponseDto } from '../dto/brandKitResponseDto';
 import { ServiceInput, ToolInput } from '../dto/save-onboarding.dto';
 
 // 🔍 Get status from profile table only (source of truth)
@@ -80,33 +79,33 @@ export async function fetchOnboardingProgress(
 }
 
 // 🧢 Get brand kit and hide parts if not paid
-export async function fetchBrandKitByUserId(
-  db: DatabaseService,
-  userId: string,
-): Promise<BrandKitResponseDto> {
-  const result = await db.query<BrandKitResponseDto>(
-    `SELECT * FROM brand_kits WHERE user_id = $1 LIMIT 1`,
-    [userId],
-  );
+// export async function fetchBrandKitByUserId(
+//   db: DatabaseService,
+//   userId: string,
+// ): Promise<BrandKitResponseDto> {
+//   const result = await db.query<BrandKitResponseDto>(
+//     `SELECT * FROM brand_kits WHERE user_id = $1 LIMIT 1`,
+//     [userId],
+//   );
 
-  if (!result.length) {
-    throw new NotFoundException('Brand kit not found');
-  }
+//   if (!result.length) {
+//     throw new NotFoundException('Brand kit not found');
+//   }
 
-  const kit = result[0];
+//   const kit = result[0];
 
-  if (!kit.is_paid) {
-    return {
-      ...kit,
-      brand_colors: kit.brand_colors.slice(0, 1),
-      services: kit.services.slice(0, 2),
-      tools: kit.tools.slice(0, 2),
-      logo_url: '', // Hide actual logo URL
-    };
-  }
+//   if (!kit.is_paid) {
+//     return {
+//       ...kit,
+//       brand_colors: kit.brand_colors.slice(0, 1),
+//       services: kit.services.slice(0, 2),
+//       tools: kit.tools.slice(0, 2),
+//       logo_url: '', // Hide actual logo URL
+//     };
+//   }
 
-  return kit;
-}
+//   return kit;
+// }
 
 // 🏷️ Tag all incoming services with `source: 'user'` if not already tagged
 export function tagServicesWithSource(

@@ -1,12 +1,14 @@
+// backend/dtos/brandKitResponse.dto.ts
+
 export interface Service {
+  id: string;
   name: string;
   price: number;
-  source: 'user' | 'ai';
 }
 
-export interface BrandTool {
+export interface Tool {
+  id: string;
   name: string;
-  source: 'user' | 'ai';
   checked: boolean;
 }
 
@@ -17,7 +19,12 @@ export interface BrandKitResponseDto {
   service_type: string;
   location: string;
   brand_colors: string[];
-  services: Service[];
-  tools: BrandTool[];
+
+  user_services: Service[];
+  suggested_services: Service[];
+
+  user_tools: Tool[];
+  suggested_tools: Tool[];
+
   is_paid: boolean;
 }

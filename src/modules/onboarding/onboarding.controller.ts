@@ -15,11 +15,15 @@ import { RequestWithUser } from 'src/common/utils/RequestWithUser';
 import { GetOnboardingResponseDto } from './dto/getOnboardingResponseDto';
 import { OnboardingService } from './onboarding.service';
 import { BrandKitResponseDto } from './dto/brandKitResponseDto';
+import { DatabaseService } from 'src/common/database/database.service';
 
 @Controller('onboarding')
 @UseGuards(AuthGuard)
 export class OnboardingController {
-  constructor(private readonly onboardingService: OnboardingService) {}
+  constructor(
+    private readonly onboardingService: OnboardingService,
+    private readonly db: DatabaseService, // 👈 add this
+  ) {}
 
   @Post('save')
   async saveProgress(
@@ -84,6 +88,7 @@ export class OnboardingController {
       throw new NotFoundException('User not found');
     }
 
-    return await this.onboardingService.getBrandKitByUserId(userId);
+    // 🔧 Inject the DB instance directly
+    return await this.onboardingService.getBrandKitByUserId(userId, this.db);
   }
 }
