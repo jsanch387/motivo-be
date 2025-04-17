@@ -21,7 +21,7 @@ export class OpenAIService {
     return response.choices[0]?.message?.content?.trim() || '';
   }
 
-  async generateMinimalistLogoImage(prompt: string): Promise<string> {
+  async generateImage(prompt: string): Promise<string> {
     const response = await this.openai.images.generate({
       model: 'dall-e-3',
       prompt,

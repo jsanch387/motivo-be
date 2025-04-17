@@ -19,7 +19,7 @@ export const INSERT_ONBOARDING_ROW = `
     selected_color_palette,
     logo_style_options,
     selected_logo_style,
-    selected_logo_id,
+    selected_logo_url,
     services,
     tools,
     slogan
@@ -43,7 +43,7 @@ export const UPDATE_ONBOARDING_ROW = `
     selected_color_palette = $9,
     logo_style_options = $10,
     selected_logo_style = $11,
-    selected_logo_id = $12,
+    selected_logo_url = $12,
     services = $13,
     tools = $14,
     slogan = $15,

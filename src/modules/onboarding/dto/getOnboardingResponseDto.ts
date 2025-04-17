@@ -16,11 +16,12 @@ export interface GetOnboardingResponseDto {
   selected_color_palette?: string[];
   logo_style_options?: string[];
   selected_logo_style?: string;
-  selected_logo_id?: string;
+  selected_logo_url?: string;
   services?: { name: string; price: number }[];
   tools?: string[];
   slogan?: string;
 
   // ✅ Returned when status is "completed"
   brand_kit?: BrandKitResponseDto;
+  flyer_url?: string | null; // ✅ optional flyer image
 }

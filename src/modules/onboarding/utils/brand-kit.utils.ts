@@ -67,7 +67,7 @@ export function filterBrandKitByAccess(
 
   return {
     ...kit,
-    suggested_services: kit.suggested_services.slice(0, 1),
-    suggested_tools: kit.suggested_tools.slice(0, 2),
+    suggested_services: kit.suggested_services.slice(0, 2), // show 2 AI suggestions
+    suggested_tools: kit.suggested_tools.slice(0, 2), // show 2 AI tools
   };
 }

@@ -32,6 +32,8 @@ import { OnboardingHelperService } from './utils/generate-brand-kit/onboardingHe
 import { generateSuggestedServicesAndTools } from './utils/generate-brand-kit/generateSuggestedServicesAndTools';
 import { buildBrandKit } from './utils/generate-brand-kit/buildBrandKit';
 import { maybeMarkOnboardingComplete } from './utils/generate-brand-kit/maybeMarkOnboardingComplete';
+import { fetchFlyerByUserId } from './utils/flyer/fetchFlyerByUser';
+import { uploadLogoToStorage } from './utils/logo/uploadLogoToStorage';
 
 @Injectable()
 export class OnboardingService {
@@ -58,21 +60,35 @@ export class OnboardingService {
       }
 
       const taggedServices = tagServicesWithSource(data.services);
-      const normalizedTools = normalizeUserTools(data.tools); // ✅ consistent format
+      const normalizedTools = normalizeUserTools(data.tools);
+
+      // ✅ Upload logo to Supabase if one is selected
+      let uploadedLogoUrl: string | null = null;
+      if (data.selected_logo_url) {
+        try {
+          uploadedLogoUrl = await uploadLogoToStorage(
+            userId,
+            data.selected_logo_url,
+          );
+          console.log('📤 Logo uploaded to Supabase:', uploadedLogoUrl);
+        } catch (err) {
+          console.error('❌ Error uploading logo to Supabase:', err);
+        }
+      }
 
       const queryParams = [
         userId,
         data.current_step,
         data.service_type || null,
         data.location || null,
-        data.readiness_level || null, // ✅ new field
+        data.readiness_level || null,
         JSON.stringify(data.business_name_suggestions || []),
         data.selected_business_name || null,
         JSON.stringify(data.brand_color_options || []),
         JSON.stringify(data.selected_color_palette || []),
         JSON.stringify(data.logo_style_options || []),
         data.selected_logo_style || null,
-        data.selected_logo_id || null,
+        uploadedLogoUrl || null, // ✅ Now storing permanent Supabase logo URL
         JSON.stringify(taggedServices),
         JSON.stringify(normalizedTools),
         data.slogan || null,
@@ -120,7 +136,7 @@ export class OnboardingService {
           selected_color_palette: [],
           logo_style_options: ['Minimal', 'Playful', 'Bold'],
           selected_logo_style: '',
-          selected_logo_id: '',
+          selected_logo_url: '',
           services: [],
           tools: [],
           slogan: '',
@@ -154,238 +170,25 @@ export class OnboardingService {
     }
 
     if (status === 'completed') {
-      const brandKit = await fetchBrandKitByUserId(this.db, userId);
+      const [brandKit, flyer] = await Promise.all([
+        fetchBrandKitByUserId(this.db, userId),
+        fetchFlyerByUserId(this.db, userId), // 👈 new query to get the flyer
+      ]);
+
       return {
         brand_kit_status: 'completed',
         brand_kit: brandKit,
+        flyer_url: flyer?.image_url ?? null, // 👈 optional field
       };
     }
 
     throw new Error('Invalid onboarding status');
   }
 
-  //   const rows = await this.db.query<FetchOnboardingDto>(
-  //     SELECT_ONBOARDING_BY_USER,
-  //     [userId],
-  //   );
-
-  //   if (!rows.length) {
-  //     throw new NotFoundException('Onboarding data not found');
-  //   }
-
-  //   const onboarding = rows[0];
-
-  //   // 🧼 Tag user services
-  //   const userServices: Service[] = (onboarding.services || []).map((svc) => ({
-  //     ...svc,
-  //     source: 'user',
-  //   }));
-
-  //   // 🧠 Mock AI service suggestions to fill up to 6 total
-  //   const mockedAiServices: Service[] = [
-  //     { name: 'Tire Shine', price: 30, source: 'ai' },
-  //     { name: 'Odor Elimination', price: 25, source: 'ai' },
-  //     { name: 'Window Tint', price: 100, source: 'ai' },
-  //     { name: 'Paint Protection', price: 150, source: 'ai' },
-  //     { name: 'Scratch Removal', price: 70, source: 'ai' },
-  //     { name: 'Eco-Friendly Wash', price: 60, source: 'ai' },
-  //   ];
-
-  //   const aiServices = mockedAiServices.slice(0, 6 - userServices.length);
-
-  //   // 🧼 Tag tools safely (handle string or structured input)
-  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //   const userTools: BrandTool[] = (onboarding.tools || []).map((tool: any) => {
-  //     if (typeof tool === 'string') {
-  //       return { name: tool, source: 'user', checked: true };
-  //     }
-  //     return {
-  //       name: tool.name,
-  //       source: tool.source || 'user',
-  //       checked: tool.checked ?? true,
-  //     };
-  //   });
-
-  //   // 🧠 Mock AI tools to fill up to 8 total
-  //   const mockedAiTools: BrandTool[] = [
-  //     { name: 'Air Compressor', checked: false, source: 'ai' },
-  //     { name: 'Water Tank', checked: false, source: 'ai' },
-  //     { name: 'Drying Towels', checked: false, source: 'ai' },
-  //     { name: 'Tool Belt', checked: false, source: 'ai' },
-  //     { name: 'Sponge Kit', checked: false, source: 'ai' },
-  //     { name: 'Portable Generator', checked: false, source: 'ai' },
-  //     { name: 'Glass Cleaner', checked: false, source: 'ai' },
-  //     { name: 'Floor Mats Cleaner', checked: false, source: 'ai' },
-  //   ];
-
-  //   const aiTools = mockedAiTools.slice(0, 8 - userTools.length);
-
-  //   const brandKit: BrandKitResponseDto = {
-  //     logo_url: onboarding.selected_logo_id || '',
-  //     business_name: onboarding.selected_business_name || 'My Business',
-  //     slogan: onboarding.slogan || 'Your go-to local service!',
-  //     brand_colors: onboarding.selected_color_palette || [],
-  //     services: [...userServices, ...aiServices],
-  //     tools: [...userTools, ...aiTools],
-  //     service_type: onboarding.service_type || '',
-  //     location: onboarding.location || '',
-  //     is_paid: false,
-  //   };
-
-  //   // 🧾 Save brand kit
-  //   await this.db.query(
-  //     `
-  //     INSERT INTO brand_kits (
-  //       user_id,
-  //       logo_url,
-  //       business_name,
-  //       slogan,
-  //       service_type,
-  //       location,
-  //       brand_colors,
-  //       services,
-  //       tools,
-  //       is_paid
-  //     ) VALUES (
-  //       $1, $2, $3, $4, $5,
-  //       $6, $7, $8, $9, $10
-  //     )
-  //   `,
-  //     [
-  //       userId,
-  //       brandKit.logo_url,
-  //       brandKit.business_name,
-  //       brandKit.slogan,
-  //       brandKit.service_type,
-  //       brandKit.location,
-  //       JSON.stringify(brandKit.brand_colors),
-  //       JSON.stringify(brandKit.services),
-  //       JSON.stringify(brandKit.tools),
-  //       brandKit.is_paid,
-  //     ],
-  //   );
-
-  //   console.log('✅ Brand kit saved to database');
-
-  //   if (onboarding.current_step === 7) {
-  //     await this.db.query(
-  //       `UPDATE profiles SET onboarding_status = 'completed' WHERE user_id = $1`,
-  //       [userId],
-  //     );
-  //     console.log('✅ Marked onboarding as completed');
-  //   }
-
-  //   return brandKit;
-  // }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-
-  // async generateBrandKit(userId: string): Promise<BrandKitResponseDto> {
-  //   const rows = await this.db.query<FetchOnboardingDto>(
-  //     SELECT_ONBOARDING_BY_USER,
-  //     [userId],
-  //   );
-  //   if (!rows.length) {
-  //     console.warn('❌ No onboarding data found for user:', userId);
-  //     throw new NotFoundException('Onboarding data not found');
-  //   }
-
-  //   const onboarding = rows[0];
-  //   console.log('🧾 Onboarding row fetched ✅');
-
-  //   const userServices = normalizeUserServices(onboarding.services);
-  //   const userTools = normalizeUserTools(onboarding.tools);
-
-  //   console.log(
-  //     `🧪 Found ${userServices.length} user service(s):`,
-  //     userServices,
-  //   );
-  //   console.log(`🧪 Found ${userTools.length} user tool(s):`, userTools);
-
-  //   const needsServices = userServices.length < 6;
-  //   const needsTools = userTools.length < 8;
-
-  //   let aiServices: Service[] = [];
-  //   let aiTools: BrandTool[] = [];
-
-  //   if (needsServices || needsTools) {
-  //     const prompt = buildServiceAndToolPrompt({
-  //       existingServices: userServices,
-  //       existingTools: userTools,
-  //       serviceType: onboarding.service_type || 'service',
-  //     });
-
-  //     console.log('🧠 Generated AI prompt:\n', prompt);
-
-  //     try {
-  //       const raw = await this.openaiService.generateCompletion(prompt);
-  //       const parsed = parseServiceAndToolResponse(raw);
-
-  //       const userServiceNames = new Set(
-  //         userServices.map((s) => s.name.toLowerCase()),
-  //       );
-  //       aiServices = parsed.services.filter(
-  //         (s) => !userServiceNames.has(s.name.toLowerCase()),
-  //       );
-
-  //       const userToolNames = new Set(
-  //         userTools.map((t) => t.name.toLowerCase()),
-  //       );
-  //       aiTools = parsed.tools.filter(
-  //         (t) => !userToolNames.has(t.name.toLowerCase()),
-  //       );
-
-  //       console.log('🤖 AI services (filtered):', aiServices);
-  //       console.log('🤖 AI tools (filtered):', aiTools);
-  //     } catch (error) {
-  //       console.error('❌ Failed to generate AI brand kit suggestions:', error);
-  //     }
-  //   }
-
-  //   const brandKit: BrandKitResponseDto = {
-  //     logo_url: onboarding.selected_logo_id || '',
-  //     business_name: onboarding.selected_business_name || 'My Business',
-  //     slogan: onboarding.slogan || 'Your go-to local service!',
-  //     brand_colors: onboarding.selected_color_palette || [],
-  //     services: [...userServices, ...aiServices],
-  //     tools: [...userTools, ...aiTools],
-  //     service_type: onboarding.service_type || '',
-  //     location: onboarding.location || '',
-  //     is_paid: false, // 🔒 this will be used in the filter logic
-  //   };
-
-  //   console.log('💾 Saving brand kit to database...');
-  //   await this.db.query(INSERT_BRAND_KIT, [
-  //     userId,
-  //     brandKit.logo_url,
-  //     brandKit.business_name,
-  //     brandKit.slogan,
-  //     brandKit.service_type,
-  //     brandKit.location,
-  //     JSON.stringify(brandKit.brand_colors),
-  //     JSON.stringify(brandKit.services),
-  //     JSON.stringify(brandKit.tools),
-  //     brandKit.is_paid,
-  //   ]);
-  //   console.log('✅ Brand kit saved.');
-
-  //   if (onboarding.current_step === 7) {
-  //     await this.db.query(MARK_ONBOARDING_COMPLETE, [userId]);
-  //     console.log('✅ Onboarding marked as complete.');
-  //   }
-
-  //   const filteredKit = filterBrandKitByAccess(brandKit);
-  //   console.log(
-  //     filteredKit.is_paid
-  //       ? '✅ Returning full brand kit (paid user)'
-  //       : '🔒 Returning locked preview brand kit (unpaid user)',
-  //   );
-
-  //   return filteredKit;
-  // }
-
   async generateBrandKit(userId: string): Promise<BrandKitResponseDto> {
     const onboarding = await this.onboardingHelper.fetchOnboardingData(userId);
+
+    console.log('📦 Onboarding Data for Brand Kit:', onboarding);
 
     const userServices = normalizeUserServices(onboarding.services);
     const userTools = normalizeUserTools(onboarding.tools);
@@ -414,56 +217,6 @@ export class OnboardingService {
 
     return filterBrandKitByAccess(brandKit);
   }
-
-  // async getBrandKitByUserId(userId: string): Promise<BrandKitResponseDto> {
-  //   const result = await this.db.query<BrandKitResponseDto>(
-  //     SELECT_BRAND_KIT_BY_USER_ID,
-  //     [userId],
-  //   );
-
-  //   if (!result.length) {
-  //     throw new NotFoundException('Brand kit not found');
-  //   }
-
-  //   const rawKit = result[0];
-  //   console.log('🧾 Raw brand kit from DB:', rawKit);
-
-  //   const parsedServices: Service[] = rawKit.services || [];
-
-  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //   const parsedTools: BrandTool[] = (rawKit.tools || []).map((tool: any) => {
-  //     if (typeof tool.name === 'object') {
-  //       return {
-  //         name: tool.name.name,
-  //         source: tool.name.source,
-  //         checked: tool.name.checked,
-  //       };
-  //     }
-  //     return {
-  //       name: tool.name,
-  //       source: tool.source,
-  //       checked: tool.checked,
-  //     };
-  //   });
-
-  //   const fullKit: BrandKitResponseDto = {
-  //     ...rawKit,
-  //     brand_colors: rawKit.brand_colors || [],
-  //     services: parsedServices,
-  //     tools: parsedTools,
-  //     logo_url: rawKit.logo_url,
-  //   };
-
-  //   const finalKit = filterBrandKitByAccess(fullKit);
-
-  //   console.log(
-  //     finalKit.is_paid
-  //       ? '✅ Returning full brand kit (paid user)'
-  //       : '🔒 Returning locked preview brand kit (unpaid user)',
-  //   );
-
-  //   return finalKit;
-  // }
 
   async getBrandKitByUserId(
     userId: string,

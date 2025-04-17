@@ -1,5 +1,3 @@
-// src/features/brandKit/helpers/buildBrandKit.ts
-
 import {
   BrandKitResponseDto,
   Service,
@@ -22,8 +20,15 @@ export function buildBrandKit({
   suggestedServices,
   suggestedTools,
 }: BuildBrandKitInput): BrandKitResponseDto {
+  console.log(
+    '🧠 Logo URL pulled for brand kit:',
+    onboarding.selected_logo_url,
+  );
+
   return {
-    logo_url: onboarding.selected_logo_id || '',
+    // ✅ Pull the permanent Supabase URL stored in onboarding
+    logo_url: onboarding.selected_logo_url || '',
+
     business_name: onboarding.selected_business_name || 'My Business',
     slogan: onboarding.slogan || 'Your go-to local service!',
     brand_colors: onboarding.selected_color_palette || [],
@@ -31,7 +36,6 @@ export function buildBrandKit({
     location: onboarding.location || '',
     is_paid: false,
 
-    // ✅ Now matches your DTO perfectly
     user_services: [...userServices],
     suggested_services: [...suggestedServices],
     user_tools: [...userTools],

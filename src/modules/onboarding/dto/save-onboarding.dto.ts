@@ -25,7 +25,7 @@ export class SaveOnboardingDto {
 
   logo_style_options?: string[];
   selected_logo_style?: string;
-  selected_logo_id?: string;
+  selected_logo_url?: string;
 
   services?: ServiceInput[];
   tools?: ToolInput[];

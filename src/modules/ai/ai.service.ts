@@ -13,12 +13,15 @@ import {
   SELECT_NAME_CONTEXT,
 } from './queries/ai.queries';
 
-import { buildBusinessNamePrompt } from './prompt/buildBusinessNamePrompt';
+import { buildBusinessNamePrompt } from './prompts/buildBusinessNamePrompt';
 import { parseBusinessNameResponse } from './helpers/parseBusinessNameResponse';
 
-import { buildColorPalettePrompt } from './prompt/buildColorPalettePrompt';
+import { buildColorPalettePrompt } from './prompts/buildColorPalettePrompt';
 import { parseColorPaletteResponse } from './helpers/parseColorPaletteResponse';
 import { GoogleAIService } from 'src/common/genai/genai.service';
+import { buildFlyerPrompt } from './prompts/flyerPrompt';
+import { fetchFlyerContext, saveFlyerToDB } from './helpers/flyer.helpers';
+import { buildLogoPrompt } from './prompts/buildLogoPrompt';
 
 @Injectable()
 export class AiService {
@@ -90,27 +93,48 @@ export class AiService {
     return rows[0];
   }
 
-  async generateMinimalistLogo(userId: string): Promise<string> {
-    const result = await this.db.query<{ service_type: string }>(
-      SELECT_LOGO_CONTEXT,
-      [userId],
-    );
+  async generateLogo(userId: string, style: string): Promise<string> {
+    const result = await this.db.query<{
+      service_type: string;
+      selected_color_palette: string[];
+    }>(SELECT_LOGO_CONTEXT, [userId]);
 
     const context = result?.[0];
     const serviceType = context?.service_type;
+    const brandColors = context?.selected_color_palette ?? [];
 
     if (!serviceType) {
       throw new NotFoundException('Missing logo context');
     }
 
-    const prompt = `Create a high-quality logo design for a ${serviceType} business. The logo should be minimalistic, modern, SVG-style, and placed on a white background. Do not include any text. The design should be clean and professional, with simple geometric or abstract elements that represent the industry. Make sure there is not text anywhere only the logo itself`;
+    const prompt = buildLogoPrompt(serviceType, style, brandColors);
 
-    const imageUrl = await this.googleAiService.generateImage(prompt);
-
+    const imageUrl = await this.openaiService.generateImage(prompt);
     if (!imageUrl || typeof imageUrl !== 'string') {
-      throw new Error('Invalid image data returned from Gemini');
+      throw new Error('Invalid image URL from OpenAI');
     }
 
+    return imageUrl;
+  }
+
+  async generateFlyer(userId: string): Promise<string> {
+    const context = await fetchFlyerContext(this.db, userId);
+
+    if (!context) {
+      throw new NotFoundException(
+        'Missing onboarding context for flyer generation',
+      );
+    }
+
+    const flyerPrompt = buildFlyerPrompt(context);
+
+    const imageUrl = await this.openaiService.generateImage(flyerPrompt);
+
+    if (!imageUrl || typeof imageUrl !== 'string') {
+      throw new Error('Invalid flyer image returned from OpenAI');
+    }
+
+    await saveFlyerToDB(this.db, userId, imageUrl);
     return imageUrl;
   }
 }

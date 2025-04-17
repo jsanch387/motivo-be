@@ -9,7 +9,7 @@ export interface FetchOnboardingDto {
   selected_color_palette: string[];
   logo_style_options: string[];
   selected_logo_style: string;
-  selected_logo_id: string;
+  selected_logo_url: string;
   services: { name: string; price: number }[];
   tools: string[];
   slogan: string;

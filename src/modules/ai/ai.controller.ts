@@ -33,25 +33,34 @@ export class AiController {
   }
 
   @Get('logo')
-  async generateLogo(@Req() req: RequestWithUser, @Res() res: Response) {
+  async generateLogo(
+    @Req() req: RequestWithUser,
+    @Query('style') style: string,
+    @Res() res: Response,
+  ) {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new BadRequestException('Missing user ID');
+    }
+
+    if (!style) {
+      throw new BadRequestException('Missing logo style');
+    }
+
+    const imageUrl = await this.aiService.generateLogo(userId, style);
+
+    res.status(200).json({ url: imageUrl });
+  }
+
+  @Get('flyer')
+  async generateFlyer(@Req() req: RequestWithUser) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('Missing required user ID');
+      throw new BadRequestException('Missing user ID');
     }
 
-    const imageData = await this.aiService.generateMinimalistLogo(userId);
-
-    const matches = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!matches) {
-      throw new BadRequestException('Invalid image data from Gemini');
-    }
-
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', 'inline; filename=logo.png');
-    res.send(buffer); // ✅ returns actual image data
+    const url = await this.aiService.generateFlyer(userId);
+    return { url };
   }
 }
