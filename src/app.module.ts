@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,11 +13,20 @@ import { GoogleAIModule } from './common/genai/genai.module';
 import { PaymentController } from './modules/payments/payments.controller';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PaymentsService } from './modules/payments/payments.service';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    DatabaseModule, // ✅ Register the global DB module once
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 3600, // 1 hour
+          limit: 30, // max 30 requests/hour/user
+        },
+      ],
+    }),
+    DatabaseModule,
     DashboardModule,
     OnboardingModule,
     AiModule,
@@ -27,6 +35,14 @@ import { PaymentsService } from './modules/payments/payments.service';
     PaymentsModule,
   ],
   controllers: [AppController, AiController, PaymentController],
-  providers: [AppService, AiService, PaymentsService],
+  providers: [
+    AppService,
+    AiService,
+    PaymentsService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

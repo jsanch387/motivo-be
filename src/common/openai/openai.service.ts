@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 
+type OpenAIImageSize = '1024x1024' | '1024x1792' | '1792x1024';
+
 @Injectable()
 export class OpenAIService {
   private openai: OpenAI;
@@ -21,12 +23,15 @@ export class OpenAIService {
     return response.choices[0]?.message?.content?.trim() || '';
   }
 
-  async generateImage(prompt: string): Promise<string> {
+  async generateImage(
+    prompt: string,
+    size: OpenAIImageSize = '1024x1024',
+  ): Promise<string> {
     const response = await this.openai.images.generate({
       model: 'dall-e-3',
       prompt,
       n: 1,
-      size: '1024x1024',
+      size,
       quality: 'hd',
       style: 'vivid',
     });

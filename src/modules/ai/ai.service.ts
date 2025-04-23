@@ -22,6 +22,7 @@ import { GoogleAIService } from 'src/common/genai/genai.service';
 import { buildFlyerPrompt } from './prompts/flyerPrompt';
 import { fetchFlyerContext, saveFlyerToDB } from './helpers/flyer.helpers';
 import { buildLogoPrompt } from './prompts/buildLogoPrompt';
+import { uploadFlyerToStorage } from '../onboarding/utils/flyer/uploadFlyerToStorage';
 
 @Injectable()
 export class AiService {
@@ -128,13 +129,22 @@ export class AiService {
 
     const flyerPrompt = buildFlyerPrompt(context);
 
-    const imageUrl = await this.openaiService.generateImage(flyerPrompt);
+    // Step 1: Generate flyer image using OpenAI
+    const openAiImageUrl = await this.openaiService.generateImage(
+      flyerPrompt,
+      '1024x1792',
+    );
 
-    if (!imageUrl || typeof imageUrl !== 'string') {
+    if (!openAiImageUrl || typeof openAiImageUrl !== 'string') {
       throw new Error('Invalid flyer image returned from OpenAI');
     }
 
-    await saveFlyerToDB(this.db, userId, imageUrl);
-    return imageUrl;
+    // Step 2: Upload to Supabase Storage and get permanent URL
+    const supabaseFlyerUrl = await uploadFlyerToStorage(userId, openAiImageUrl);
+
+    // Step 3: Save permanent URL to DB
+    await saveFlyerToDB(this.db, userId, supabaseFlyerUrl);
+
+    return supabaseFlyerUrl;
   }
 }
