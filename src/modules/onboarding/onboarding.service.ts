@@ -130,14 +130,24 @@ export class OnboardingService {
       if (data.selected_logo_url) {
         uploadedLogoUrl = data.selected_logo_url;
 
-        // ✅ Insert logo metadata into logos table
-        await insertGeneratedLogo(this.db, {
-          user_id: userId,
-          style: data.selected_logo_style || 'unknown',
-          image_url: uploadedLogoUrl,
-          service_type: data.service_type || '',
-          colors: data.selected_color_palette || [],
-        });
+        // ✅ Check if logo already exists before inserting
+        const existingLogos = await this.db.query<{ id: string }>(
+          `SELECT id FROM logos WHERE user_id = $1 AND image_url = $2`,
+          [userId, uploadedLogoUrl],
+        );
+
+        if (existingLogos.length === 0) {
+          await insertGeneratedLogo(this.db, {
+            user_id: userId,
+            style: data.selected_logo_style || 'unknown',
+            image_url: uploadedLogoUrl,
+            service_type: data.service_type || '',
+            colors: data.selected_color_palette || [],
+          });
+          console.log('✅ Inserted new logo entry.');
+        } else {
+          console.log('✅ Logo already exists, skipping insert.');
+        }
       }
 
       const queryParams = [
@@ -152,7 +162,7 @@ export class OnboardingService {
         JSON.stringify(data.selected_color_palette || []),
         JSON.stringify(data.logo_style_options || []),
         data.selected_logo_style || null,
-        uploadedLogoUrl || null, // Supabase URL already uploaded
+        uploadedLogoUrl || null,
         JSON.stringify(taggedServices),
         JSON.stringify(normalizedTools),
         data.slogan || null,

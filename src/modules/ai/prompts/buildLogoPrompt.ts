@@ -31,6 +31,7 @@ Your task is to generate **3 different logo concepts**. Use your expert judgment
 - At least one design that is a clean, symbolic icon with no text
 
 Guidelines:
+- The logo must look good in a white background
 - No mockups or backgrounds
 - No gradients or 3D effects
 - Logos should be scalable, vector-friendly, and suitable for use on websites, signs, and social media

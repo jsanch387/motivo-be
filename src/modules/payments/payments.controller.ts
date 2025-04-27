@@ -18,19 +18,6 @@ export class PaymentController {
   constructor(private readonly paymentService: PaymentsService) {}
 
   @UseGuards(AuthGuard)
-  @Post('brand-kit/unlock')
-  async unlockBrandKit(@Req() req: RequestWithUser) {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      throw new BadRequestException('Missing user ID');
-    }
-
-    const result = await this.paymentService.unlockBrandKit(userId);
-    return { success: true, brand_kit: result };
-  }
-
-  @UseGuards(AuthGuard)
   @Post('/checkout')
   async createCheckoutSession(@Req() req: RequestWithUser) {
     const userId = req.user?.id;

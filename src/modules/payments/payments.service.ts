@@ -17,27 +17,21 @@ export class PaymentsService {
     });
   }
   async createCheckoutSession(userId: string) {
-    const userIdStr = String(userId); // Ensure it's a string and not undefined/null
+    const userIdStr = String(userId);
 
     const session = await this.stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Brand Kit Access',
-            },
-            unit_amount: 1900, // $19.00
-          },
+          price: process.env.STRIPE_BRAND_KIT_PRICE_ID, // ✅ use real Price ID
           quantity: 1,
         },
       ],
       metadata: {
-        userId: userIdStr, // ✅ must be a string
+        userId: userIdStr,
       },
-      client_reference_id: userIdStr, // ✅ optional, but useful
+      client_reference_id: userIdStr,
       success_url: `${process.env.FRONTEND_URL}/dashboard/brand-kit`,
       cancel_url: `${process.env.FRONTEND_URL}/dashboard/cancel`,
     });
