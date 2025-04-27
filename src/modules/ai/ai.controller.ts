@@ -48,9 +48,11 @@ export class AiController {
       throw new BadRequestException('Missing logo style');
     }
 
-    const imageUrl = await this.aiService.generateLogo(userId, style);
+    // This returns an array of logo URLs
+    const imageUrls = await this.aiService.generateLogos(userId, style);
 
-    res.status(200).json({ url: imageUrl });
+    // ✅ Return them as an array under "urls"
+    res.status(200).json({ urls: imageUrls });
   }
 
   @Get('flyer')

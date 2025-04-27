@@ -6,14 +6,32 @@ type FlyerContext = {
 };
 
 export function buildFlyerPrompt(context: FlyerContext): string {
-  const { selected_business_name, service_type, location, slogan } = context;
+  const { selected_business_name, service_type, location } = context;
 
   return `
-      Create a visually engaging flyer for a business named "${selected_business_name}".
-      This is a ${service_type} business located in ${location}.
-      Include the slogan: "${slogan}".
-      The flyer should be modern, bold, and social-media ready — good for Instagram or a printed poster.
-      Use clear spacing, vibrant colors, and balance visual design with minimal text.
-      Only include design — do not include placeholder contact details or watermarks.
-    `.trim();
+Create a visually engaging and persuasive flyer for a small business.
+
+BUSINESS NAME:
+"${selected_business_name}"
+
+BUSINESS TYPE:
+${service_type}
+
+LOCATION:
+Mention or reflect that the business is based in or serves the area of: ${location}
+
+GOAL:
+Design a social-media-ready flyer that showcases what this business offers in a compelling way. It should attract attention on platforms like Instagram or work well as a printed poster or handout.
+
+DESIGN REQUIREMENTS:
+- Include strong, relevant imagery that matches the business type (e.g. visuals for car detailing, baked goods, landscaping, tutoring, etc.)
+- You may include short, catchy marketing text or questions (e.g. “Need your car spotless?”, “Desserts made fresh!”) to draw attention
+- Highlight the business name prominently
+- Keep the layout clean, modern, and well-balanced
+- Do not include contact information, phone numbers, email, or website
+- Do not add watermarks or placeholder icons/logos
+- Avoid using imagery that doesn't fit the industry
+
+The final design should feel professional, bold, and clear.
+`.trim();
 }

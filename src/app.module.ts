@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
-import { DatabaseModule } from './common/database/database.module'; // ✅
+import { DatabaseModule } from './common/database/database.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AiController } from './modules/ai/ai.controller';
 import { OpenAIModule } from './common/openai/openai.module';
@@ -13,11 +16,10 @@ import { GoogleAIModule } from './common/genai/genai.module';
 import { PaymentController } from './modules/payments/payments.controller';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PaymentsService } from './modules/payments/payments.service';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }), // ✅ Ensure .env is loaded
     ThrottlerModule.forRoot({
       throttlers: [
         {

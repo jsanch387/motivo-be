@@ -22,7 +22,7 @@ import { GoogleAIService } from 'src/common/genai/genai.service';
 import { buildFlyerPrompt } from './prompts/flyerPrompt';
 import { fetchFlyerContext, saveFlyerToDB } from './helpers/flyer.helpers';
 import { buildLogoPrompt } from './prompts/buildLogoPrompt';
-import { uploadFlyerToStorage } from '../onboarding/utils/flyer/uploadFlyerToStorage';
+import { uploadFlyerBufferToStorage } from '../onboarding/utils/flyer/uploadFlyerBufferToStorage';
 
 @Injectable()
 export class AiService {
@@ -63,15 +63,15 @@ export class AiService {
   }
 
   private async generateColorPalettes(userId: string): Promise<string[][]> {
-    const onboarding = await this.fetchColorContext(userId);
+    const context = await this.fetchColorContext(userId);
 
-    if (!onboarding?.service_type || !onboarding?.selected_business_name) {
+    if (!context?.service_type || !context?.business_name) {
       throw new NotFoundException('Missing context for color generation');
     }
 
     const prompt = buildColorPalettePrompt(
-      onboarding.service_type,
-      onboarding.selected_business_name,
+      context.service_type,
+      context.business_name,
     );
 
     const raw = await this.openaiService.generateCompletion(prompt);
@@ -89,12 +89,22 @@ export class AiService {
   private async fetchColorContext(userId: string) {
     const rows = await this.db.query<{
       service_type: string;
-      selected_business_name: string;
+      selected_business_name: string | null;
+      custom_name: string | null;
     }>(SELECT_COLOR_CONTEXT, [userId]);
-    return rows[0];
+
+    const context = rows[0];
+    if (!context) return null;
+
+    return {
+      service_type: context.service_type,
+      business_name:
+        context.selected_business_name || context.custom_name || '',
+    };
   }
 
-  async generateLogo(userId: string, style: string): Promise<string> {
+  async generateLogos(userId: string, style: string): Promise<string[]> {
+    // Step 1: Fetch logo generation context
     const result = await this.db.query<{
       service_type: string;
       selected_color_palette: string[];
@@ -108,14 +118,42 @@ export class AiService {
       throw new NotFoundException('Missing logo context');
     }
 
-    const prompt = buildLogoPrompt(serviceType, style, brandColors);
+    // Step 2: Fetch optional business name
+    const businessNameResult = await this.db.query<{
+      selected_business_name: string;
+    }>(`SELECT selected_business_name FROM onboarding WHERE user_id = $1`, [
+      userId,
+    ]);
 
-    const imageUrl = await this.openaiService.generateImage(prompt);
-    if (!imageUrl || typeof imageUrl !== 'string') {
-      throw new Error('Invalid image URL from OpenAI');
-    }
+    const businessName = businessNameResult?.[0]?.selected_business_name;
 
-    return imageUrl;
+    console.log('🧩 Generating logos (hybrid prompt) for user:', userId);
+    console.log('Style:', style);
+    console.log('Service Type:', serviceType);
+    console.log('Brand Colors:', brandColors);
+    console.log('Business Name:', businessName);
+
+    // Step 3: Build a single balanced prompt
+    const prompt = buildLogoPrompt(
+      serviceType,
+      style,
+      brandColors,
+      businessName,
+    );
+
+    // Step 4: Generate 3 images with a single call
+    const logoBuffers = await this.openaiService.generateImage(
+      prompt,
+      '1024x1024',
+      3,
+    );
+
+    // Step 5: Convert Buffers to base64 image URLs
+    const base64Urls = logoBuffers.map((buffer) => {
+      return `data:image/png;base64,${buffer.toString('base64')}`;
+    });
+
+    return base64Urls;
   }
 
   async generateFlyer(userId: string): Promise<string> {
@@ -129,22 +167,23 @@ export class AiService {
 
     const flyerPrompt = buildFlyerPrompt(context);
 
-    // Step 1: Generate flyer image using OpenAI
-    const openAiImageUrl = await this.openaiService.generateImage(
+    // Step 1: Generate image (returns Buffer[])
+    const [flyerBuffer] = await this.openaiService.generateImage(
       flyerPrompt,
-      '1024x1792',
+      '1024x1536',
+      1, // generate just 1 flyer
     );
 
-    if (!openAiImageUrl || typeof openAiImageUrl !== 'string') {
-      throw new Error('Invalid flyer image returned from OpenAI');
+    if (!flyerBuffer) {
+      throw new Error('No flyer image generated');
     }
 
-    // Step 2: Upload to Supabase Storage and get permanent URL
-    const supabaseFlyerUrl = await uploadFlyerToStorage(userId, openAiImageUrl);
+    // Step 2: Upload to Supabase Storage
+    const flyerUrl = await uploadFlyerBufferToStorage(userId, flyerBuffer);
 
-    // Step 3: Save permanent URL to DB
-    await saveFlyerToDB(this.db, userId, supabaseFlyerUrl);
+    // Step 3: Save flyer URL in the database
+    await saveFlyerToDB(this.db, userId, flyerUrl);
 
-    return supabaseFlyerUrl;
+    return flyerUrl;
   }
 }

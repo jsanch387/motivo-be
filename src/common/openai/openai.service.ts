@@ -1,15 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 
-type OpenAIImageSize = '1024x1024' | '1024x1792' | '1792x1024';
-
 @Injectable()
 export class OpenAIService {
-  private openai: OpenAI;
+  private openai;
 
   constructor() {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY!,
     });
   }
 
@@ -25,19 +24,26 @@ export class OpenAIService {
 
   async generateImage(
     prompt: string,
-    size: OpenAIImageSize = '1024x1024',
-  ): Promise<string> {
+    size: '1024x1024' | '1024x1536' | '1536x1024' = '1024x1024',
+    count: number = 1,
+  ): Promise<Buffer[]> {
     const response = await this.openai.images.generate({
-      model: 'dall-e-3',
+      model: 'gpt-image-1',
       prompt,
-      n: 1,
+      n: count,
       size,
-      quality: 'hd',
-      style: 'vivid',
+      quality: 'high',
     });
 
-    const url = response.data[0]?.url;
-    if (!url) throw new Error('OpenAI failed to return image URL');
-    return url;
+    const images = response.data;
+
+    if (!images || images.length === 0) {
+      throw new Error('No images returned from OpenAI');
+    }
+
+    return images.map((img) => {
+      if (!img.b64_json) throw new Error('Missing base64 data in response');
+      return Buffer.from(img.b64_json, 'base64');
+    });
   }
 }

@@ -33,7 +33,7 @@ import { generateSuggestedServicesAndTools } from './utils/generate-brand-kit/ge
 import { buildBrandKit } from './utils/generate-brand-kit/buildBrandKit';
 import { maybeMarkOnboardingComplete } from './utils/generate-brand-kit/maybeMarkOnboardingComplete';
 import { fetchFlyerByUserId } from './utils/flyer/fetchFlyerByUser';
-import { uploadLogoToStorage } from './utils/logo/uploadLogoToStorage';
+import { insertGeneratedLogo } from '../ai/helpers/logo.helpers';
 
 @Injectable()
 export class OnboardingService {
@@ -42,38 +42,102 @@ export class OnboardingService {
     private readonly openaiService: OpenAIService,
     private readonly onboardingHelper: OnboardingHelperService,
   ) {}
+  // async saveProgress(userId: string, data: SaveOnboardingDto): Promise<void> {
+  //   try {
+  //     console.log(
+  //       '[POST /onboarding/save] Incoming save request for user:',
+  //       userId,
+  //     );
+  //     console.log('Request Body:', data);
+
+  //     const status = await getCurrentOnboardingStatus(this.db, userId);
+  //     console.log('Current onboarding status:', status);
+
+  //     if (status === 'completed') {
+  //       console.warn('User has completed onboarding. Skipping update.');
+  //       return;
+  //     }
+
+  //     const taggedServices = tagServicesWithSource(data.services);
+  //     const normalizedTools = normalizeUserTools(data.tools);
+
+  //     // ✅ Upload logo only if it's a base64 image
+  //     let uploadedLogoUrl: string | null = null;
+
+  //     if (data.selected_logo_url) {
+  //       uploadedLogoUrl = await handleSelectedLogo(userId, data, this.db);
+  //     }
+
+  //     const queryParams = [
+  //       userId,
+  //       data.current_step,
+  //       data.service_type || null,
+  //       data.location || null,
+  //       data.readiness_level || null,
+  //       JSON.stringify(data.business_name_suggestions || []),
+  //       data.selected_business_name || null,
+  //       JSON.stringify(data.brand_color_options || []),
+  //       JSON.stringify(data.selected_color_palette || []),
+  //       JSON.stringify(data.logo_style_options || []),
+  //       data.selected_logo_style || null,
+  //       uploadedLogoUrl || null, // ✅ Only the uploaded Supabase URL is stored
+  //       JSON.stringify(taggedServices),
+  //       JSON.stringify(normalizedTools),
+  //       data.slogan || null,
+  //     ];
+
+  //     if (!data.current_step) {
+  //       throw new Error('Missing required field: current_step');
+  //     }
+
+  //     if (status === 'not_started') {
+  //       console.log('Creating new onboarding entry...');
+  //       await this.db.query(INSERT_ONBOARDING_ROW, queryParams);
+  //       await this.db.query(UPDATE_PROFILE_ONBOARDING_STATUS, [userId]);
+  //       console.log('Onboarding row created and status updated to in_progress');
+  //     } else {
+  //       console.log('Updating existing onboarding row...');
+  //       await this.db.query(UPDATE_ONBOARDING_ROW, queryParams);
+  //       console.log('Onboarding row updated');
+  //     }
+  //   } catch (err) {
+  //     console.error('Failed to save onboarding data:', err);
+  //     throw new InternalServerErrorException('Failed to save onboarding data');
+  //   }
+  // }
 
   async saveProgress(userId: string, data: SaveOnboardingDto): Promise<void> {
     try {
       console.log(
-        '📝 [POST /onboarding/save] Incoming save request for user:',
+        '[POST /onboarding/save] Incoming save request for user:',
         userId,
       );
-      console.log('📦 Request Body:', data);
+      console.log('Request Body:', data);
 
       const status = await getCurrentOnboardingStatus(this.db, userId);
-      console.log('📊 Current onboarding status:', status);
+      console.log('Current onboarding status:', status);
 
       if (status === 'completed') {
-        console.warn('🚫 User has completed onboarding. Skipping update.');
+        console.warn('User has completed onboarding. Skipping update.');
         return;
       }
 
       const taggedServices = tagServicesWithSource(data.services);
       const normalizedTools = normalizeUserTools(data.tools);
 
-      // ✅ Upload logo to Supabase if one is selected
       let uploadedLogoUrl: string | null = null;
+
       if (data.selected_logo_url) {
-        try {
-          uploadedLogoUrl = await uploadLogoToStorage(
-            userId,
-            data.selected_logo_url,
-          );
-          console.log('📤 Logo uploaded to Supabase:', uploadedLogoUrl);
-        } catch (err) {
-          console.error('❌ Error uploading logo to Supabase:', err);
-        }
+        uploadedLogoUrl = data.selected_logo_url;
+
+        // ✅ Insert logo metadata into logos table
+        await insertGeneratedLogo(this.db, {
+          user_id: userId,
+          style: data.selected_logo_style || 'unknown',
+          image_url: uploadedLogoUrl,
+          service_type: data.service_type || '',
+          colors: data.selected_color_palette || [],
+        });
       }
 
       const queryParams = [
@@ -88,30 +152,28 @@ export class OnboardingService {
         JSON.stringify(data.selected_color_palette || []),
         JSON.stringify(data.logo_style_options || []),
         data.selected_logo_style || null,
-        uploadedLogoUrl || null, // ✅ Now storing permanent Supabase logo URL
+        uploadedLogoUrl || null, // Supabase URL already uploaded
         JSON.stringify(taggedServices),
         JSON.stringify(normalizedTools),
         data.slogan || null,
       ];
 
       if (!data.current_step) {
-        throw new Error('❗ Missing required field: current_step');
+        throw new Error('Missing required field: current_step');
       }
 
       if (status === 'not_started') {
-        console.log('🆕 Creating new onboarding entry...');
+        console.log('Creating new onboarding entry...');
         await this.db.query(INSERT_ONBOARDING_ROW, queryParams);
-        console.log('✅ Onboarding row inserted');
-
         await this.db.query(UPDATE_PROFILE_ONBOARDING_STATUS, [userId]);
-        console.log('✅ Profile onboarding status updated to in_progress');
+        console.log('Onboarding row created and status updated to in_progress');
       } else {
-        console.log('✏️ Updating existing onboarding row...');
+        console.log('Updating existing onboarding row...');
         await this.db.query(UPDATE_ONBOARDING_ROW, queryParams);
-        console.log('✅ Onboarding row updated');
+        console.log('Onboarding row updated');
       }
     } catch (err) {
-      console.error('❌ Failed to save onboarding data:', err);
+      console.error('Failed to save onboarding data:', err);
       throw new InternalServerErrorException('Failed to save onboarding data');
     }
   }
