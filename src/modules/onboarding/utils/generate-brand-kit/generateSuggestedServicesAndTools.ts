@@ -29,27 +29,44 @@ export async function generateSuggestedServicesAndTools({
 
   console.log('🧠 Generated AI prompt:\n', prompt);
 
-  try {
-    const raw = await openaiService.generateCompletion(prompt);
-    const parsed = parseServiceAndToolResponse(raw);
+  const maxRetries = 2;
+  let lastError: unknown;
 
-    const existingServiceNames = new Set(
-      existingServices.map((s) => s.name.toLowerCase()),
-    );
-    const existingToolNames = new Set(
-      existingTools.map((t) => t.name.toLowerCase()),
-    );
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const raw = await openaiService.generateCompletion(prompt);
 
-    const suggestedServices = parsed.services.filter(
-      (s) => !existingServiceNames.has(s.name.toLowerCase()),
-    );
-    const suggestedTools = parsed.tools.filter(
-      (t) => !existingToolNames.has(t.name.toLowerCase()),
-    );
+      // Clean markdown-style ```json ``` wrappers if present
+      const cleaned = raw.replace(/```json|```/g, '').trim();
 
-    return { suggestedServices, suggestedTools };
-  } catch (error) {
-    console.error('❌ Failed to generate AI brand kit suggestions:', error);
-    return { suggestedServices: [], suggestedTools: [] };
+      const parsed = parseServiceAndToolResponse(cleaned);
+
+      const existingServiceNames = new Set(
+        existingServices.map((s) => s.name.toLowerCase()),
+      );
+      const existingToolNames = new Set(
+        existingTools.map((t) => t.name.toLowerCase()),
+      );
+
+      const suggestedServices = parsed.services.filter(
+        (s) => !existingServiceNames.has(s.name.toLowerCase()),
+      );
+      const suggestedTools = parsed.tools.filter(
+        (t) => !existingToolNames.has(t.name.toLowerCase()),
+      );
+
+      return { suggestedServices, suggestedTools };
+    } catch (error) {
+      lastError = error;
+      console.warn(`❌ Attempt ${attempt} failed to parse AI response:`, error);
+
+      if (attempt > maxRetries) {
+        throw new Error(
+          `AI failed to return valid service/tool suggestions after ${maxRetries + 1} attempts.`,
+        );
+      }
+    }
   }
+
+  throw lastError;
 }

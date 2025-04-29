@@ -267,14 +267,33 @@ export class OnboardingService {
 
     const needsSuggestions = userServices.length < 6 || userTools.length < 8;
 
-    const { suggestedServices, suggestedTools } = needsSuggestions
-      ? await generateSuggestedServicesAndTools({
+    let suggestedServices: Service[] = [];
+    let suggestedTools: Tool[] = [];
+
+    if (needsSuggestions) {
+      try {
+        const result = await generateSuggestedServicesAndTools({
           serviceType: onboarding.service_type || '',
           existingServices: userServices,
           existingTools: userTools,
           openaiService: this.openaiService,
-        })
-      : { suggestedServices: [], suggestedTools: [] };
+        });
+
+        suggestedServices = result.suggestedServices;
+        suggestedTools = result.suggestedTools;
+
+        // 🚨 If still missing after retries, we must fail.
+        if (suggestedServices.length === 0 || suggestedTools.length === 0) {
+          console.error('❌ Missing services or tools after AI generation.');
+          throw new Error(
+            'Unable to generate a complete brand kit. Missing services or tools.',
+          );
+        }
+      } catch (error) {
+        console.error('❌ Failed to generate AI brand kit suggestions:', error);
+        throw new Error('Unable to generate brand kit: AI suggestion failed.');
+      }
+    }
 
     const brandKit = buildBrandKit({
       onboarding,
