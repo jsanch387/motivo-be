@@ -31,6 +31,8 @@ DESIGN REQUIREMENTS:
 - Do not include contact information, phone numbers, email, or website
 - Do not add watermarks or placeholder icons/logos
 - Avoid using imagery that doesn't fit the industry
+- Use flat design only (no drop shadows, 3D effects, or bevels)
+- Dont include services offered, pricing, or any other details keep it generic
 
 The final design should feel professional, bold, and clear.
 `.trim();
