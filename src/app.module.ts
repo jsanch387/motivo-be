@@ -16,6 +16,8 @@ import { GoogleAIModule } from './common/genai/genai.module';
 import { PaymentController } from './modules/payments/payments.controller';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PaymentsService } from './modules/payments/payments.service';
+import { LaunchModule } from './modules/launch/launch.module';
+import { LaunchService } from './modules/launch/launch.service';
 
 @Module({
   imports: [
@@ -35,11 +37,13 @@ import { PaymentsService } from './modules/payments/payments.service';
     OpenAIModule,
     GoogleAIModule,
     PaymentsModule,
+    LaunchModule,
   ],
   controllers: [AppController, AiController, PaymentController],
   providers: [
     AppService,
     AiService,
+    LaunchService,
     PaymentsService,
     {
       provide: APP_GUARD,

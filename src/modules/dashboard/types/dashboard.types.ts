@@ -23,5 +23,5 @@ export interface DashboardState {
 export interface DashboardResponse {
   onboardingStatus: OnboardingStatus;
   progress?: DashboardProgress;
-  nextSteps?: DashboardNextStep[];
+  isPaid?: boolean;
 }

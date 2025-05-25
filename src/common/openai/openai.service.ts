@@ -16,7 +16,6 @@ export class OpenAIService {
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
     });
 
     return response.choices[0]?.message?.content?.trim() || '';
@@ -45,5 +44,26 @@ export class OpenAIService {
       if (!img.b64_json) throw new Error('Missing base64 data in response');
       return Buffer.from(img.b64_json, 'base64');
     });
+  }
+
+  async generateJsonWithRetries<T>(prompt: string, maxRetries = 3): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const response = await this.generateCompletion(prompt);
+
+      try {
+        const parsed = JSON.parse(response) as T;
+        return parsed;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e) {
+        console.warn(`Attempt ${attempt} failed to parse JSON:`, response);
+        if (attempt === maxRetries) {
+          throw new Error(
+            'Failed to generate valid JSON from OpenAI after retries',
+          );
+        }
+      }
+    }
+
+    throw new Error('Unreachable');
   }
 }

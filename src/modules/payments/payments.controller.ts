@@ -12,10 +12,14 @@ import { AuthGuard } from 'src/common/guards/auth.guard';
 import { RequestWithUser } from 'src/common/utils/RequestWithUser';
 import { PaymentsService } from './payments.service';
 import Stripe from 'stripe';
+import { LaunchService } from '../launch/launch.service';
 
 @Controller('payments')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentsService) {}
+  constructor(
+    private readonly paymentService: PaymentsService,
+    private readonly launchService: LaunchService,
+  ) {}
 
   @UseGuards(AuthGuard)
   @Post('/checkout')
@@ -77,6 +81,9 @@ export class PaymentController {
 
       console.log(`🔓 Unlocking brand kit for user: ${userId}`);
       await this.paymentService.unlockBrandKit(userId);
+
+      console.log(`🚀 Creating launch guide steps for user: ${userId}`);
+      await this.launchService.createLaunchGuideForUser(userId);
     }
 
     return { received: true };

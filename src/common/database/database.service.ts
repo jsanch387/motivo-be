@@ -31,4 +31,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     console.log('🧹 Closing database connection...');
     await this.pool.end();
   }
+
+  // ✅ NEW → returns first row or null
+  async queryOneOrNull<T = any>(
+    sql: string,
+    params?: any[],
+  ): Promise<T | null> {
+    const { rows } = await this.pool.query(sql, params);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  // ✅ NEW → returns raw result (for rowCount etc)
+  async queryResult(sql: string, params?: any[]): Promise<any> {
+    return await this.pool.query(sql, params);
+  }
 }
