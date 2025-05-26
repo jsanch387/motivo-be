@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DashboardResponse } from './types/dashboard.types';
+import { DashboardResponse, OnboardingStatus } from './types/dashboard.types';
 import { DatabaseService } from 'src/common/database/database.service';
 
 @Injectable()
@@ -16,12 +16,14 @@ export class DashboardService {
       throw new NotFoundException('User profile not found');
     }
 
-    const onboardingStatus = profile[0].onboarding_status;
+    const onboardingStatus = profile[0].onboarding_status as OnboardingStatus;
 
+    // Case 1: not_started
     if (onboardingStatus === 'not_started') {
       return { onboardingStatus: 'not_started' };
     }
 
+    // Case 2: in_progress
     if (onboardingStatus === 'in_progress') {
       const onboarding = await this.db.query<{ current_step: number }>(
         'SELECT current_step FROM onboarding WHERE user_id = $1 LIMIT 1',
@@ -35,18 +37,28 @@ export class DashboardService {
         progress: {
           completedSteps: currentStep - 1,
           totalSteps: 7,
-          completedStepLabels: [], // optional for now
+          completedStepLabels: [],
           currentStep: `Step ${currentStep}`,
         },
       };
     }
 
-    return {
-      onboardingStatus: 'completed',
-      nextSteps: [
-        { label: 'Set Pricing', completed: false, action: '/pricing' },
-        { label: 'Publish Site', completed: false, action: '/publish' },
-      ],
-    };
+    // Case 3: completed → also check brand kit for is_paid
+    if (onboardingStatus === 'completed') {
+      const brandKit = await this.db.query<{ is_paid: boolean }>(
+        'SELECT is_paid FROM brand_kits WHERE user_id = $1 LIMIT 1',
+        [userId],
+      );
+
+      const isPaid = brandKit[0]?.is_paid ?? false;
+
+      return {
+        onboardingStatus: 'completed',
+        isPaid,
+      };
+    }
+
+    // ✅ fallback for TypeScript safety
+    throw new Error(`Unhandled onboardingStatus: ${String(onboardingStatus)}`);
   }
 }
