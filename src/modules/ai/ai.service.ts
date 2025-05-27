@@ -1,9 +1,5 @@
 // src/modules/ai/ai.service.ts
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from 'src/common/openai/openai.service';
 import { DatabaseService } from 'src/common/database/database.service';
 
@@ -33,29 +29,34 @@ export class AiService {
   ) {}
 
   async generate(
-    type: 'business_names' | 'brand_colors',
+    type: string,
     userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    body: any = {},
   ): Promise<string[] | string[][]> {
     switch (type) {
       case 'business_names':
-        return this.generateBusinessNames(userId);
+        return this.generateBusinessNames(userId, body.alreadySuggested || []);
       case 'brand_colors':
         return this.generateColorPalettes(userId);
       default:
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new BadRequestException(`Unsupported generation type: ${type}`);
+        throw new Error(`Unsupported generation type`);
     }
   }
 
-  private async generateBusinessNames(userId: string): Promise<string[]> {
+  private async generateBusinessNames(
+    userId: string,
+    alreadySuggested: string[],
+  ): Promise<string[]> {
     const onboarding = await this.fetchNameContext(userId);
     if (!onboarding?.service_type) {
-      throw new NotFoundException('Missing service_type for user');
+      throw new Error('Missing service_type for user');
     }
 
     const prompt = buildBusinessNamePrompt(
       onboarding.service_type,
       onboarding.location,
+      alreadySuggested,
     );
 
     const raw = await this.openaiService.generateCompletion(prompt);

@@ -1,23 +1,31 @@
 export function buildBusinessNamePrompt(
   serviceType: string,
   location?: string,
+  alreadySuggested: string[] = [],
 ): string {
-  return `
-You are an expert brand consultant. Suggest 6 professional and brandable business names for a new company.
+  const blacklist = alreadySuggested.length
+    ? `Avoid these names: ${alreadySuggested.map((name) => `"${name}"`).join(', ')}.`
+    : '';
 
-Business type: ${serviceType}
-${location ? `Target region: ${location}` : ''}
+  return `
+You are a professional brand strategist. Suggest 6 unique, professional business names for a new ${serviceType} company.
+
+${location ? `The business operates in ${location}. You may include this in the name only if it sounds natural and brandable.` : ''}
 
 Guidelines:
-- Names should be short, professional, and trustworthy
-- Avoid humor, slang, or gimmicks
-- You may include the location if it sounds natural
-- Return only a JSON array of strings — no extra text
+- Names should be short, memorable, and trustworthy
+- Avoid using personal names, "LLC", numbers, or generic phrases
+- Do NOT return basic names like "Daniel's ${serviceType}" or "Austin ${serviceType} LLC"
+- Do NOT include repeated names or any from earlier suggestions
+${blacklist}
+
+Return only a valid JSON array of strings. No explanations, no labels, no extra text.
 
 Format:
 [
-  "Name One",
-  "Name Two",
+  "Business Name 1",
+  "Business Name 2",
+  "Business Name 3",
   ...
 ]
 `.trim();

@@ -6,6 +6,8 @@ import {
   UseGuards,
   BadRequestException,
   Res,
+  Post,
+  Body,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AiService } from './ai.service';
@@ -17,9 +19,10 @@ import { RequestWithUser } from 'src/common/utils/RequestWithUser';
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  @Get('generate')
+  @Post('generate')
   async generate(
-    @Query('type') type: 'business_names' | 'brand_colors',
+    @Query('type') type: string,
+    @Body() body: { alreadySuggested?: string[] },
     @Req() req: RequestWithUser,
   ) {
     const userId = req.user?.id;
@@ -28,7 +31,7 @@ export class AiController {
       throw new BadRequestException('Missing required params: type and userId');
     }
 
-    const result = await this.aiService.generate(type, userId);
+    const result = await this.aiService.generate(type, userId, body);
     return { result };
   }
 
