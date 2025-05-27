@@ -8,18 +8,20 @@ export function buildBusinessNamePrompt(
     : '';
 
   return `
-You are a professional brand strategist. Suggest 6 unique, professional business names for a new ${serviceType} company.
+You are a professional brand strategist. Suggest 6 unique and trustworthy business names for a new company in the ${serviceType} industry.
 
-${location ? `The business operates in ${location}. You may include this in the name only if it sounds natural and brandable.` : ''}
+${location ? `The business is based in ${location}. You may include this in the name only if it enhances the brand and sounds natural.` : ''}
 
 Guidelines:
-- Names should be short, memorable, and trustworthy
-- Avoid using personal names, "LLC", numbers, or generic phrases
-- Do NOT return basic names like "Daniel's ${serviceType}" or "Austin ${serviceType} LLC"
-- Do NOT include repeated names or any from earlier suggestions
+- Names should be professional, modern, and memorable
+- Avoid puns, jokes, gimmicks, or slang
+- Do NOT include personal names (like “Daniel’s Detailing”) or generic phrases (like “Austin LLC”)
+- Do NOT use numbers, symbols, or legal suffixes like “LLC” or “Inc.”
+- Names must be brandable and inspire confidence in the quality of service
+
 ${blacklist}
 
-Return only a valid JSON array of strings. No explanations, no labels, no extra text.
+Return only a JSON array of 6 business name strings — no formatting, no extra explanation, no labels.
 
 Format:
 [
