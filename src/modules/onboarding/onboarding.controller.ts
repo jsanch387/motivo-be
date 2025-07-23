@@ -1,94 +1,47 @@
+// src/onboarding/onboarding.controller.ts
+// ... (imports)
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  UseGuards,
-  Req,
-  NotFoundException,
+  Controller,
+  InternalServerErrorException,
+  Post,
 } from '@nestjs/common';
-
-import { AuthGuard } from 'src/common/guards/auth.guard';
-import { SaveOnboardingDto } from './dto/save-onboarding.dto';
-
-import { RequestWithUser } from 'src/common/utils/RequestWithUser';
-import { GetOnboardingResponseDto } from './dto/getOnboardingResponseDto';
 import { OnboardingService } from './onboarding.service';
-import { BrandKitResponseDto } from './dto/brandKitResponseDto';
-import { DatabaseService } from 'src/common/database/database.service';
+import { ProductRequestDto } from 'src/features/request-form/dto/product-request.dto';
+// ... (other parts of the controller)
 
 @Controller('onboarding')
-@UseGuards(AuthGuard)
+// Remember to manage AuthGuard if this endpoint is public
 export class OnboardingController {
   constructor(
-    private readonly onboardingService: OnboardingService,
-    private readonly db: DatabaseService, // 👈 add this
+    private readonly onboardingService: OnboardingService, // Inject OnboardingService
   ) {}
 
-  @Post('save')
-  async saveProgress(
-    @Body() body: SaveOnboardingDto,
-    @Req() req: RequestWithUser,
-  ): Promise<{ success: true }> {
-    const userId = req['user']?.id;
+  // ... (existing methods like saveProgress, fetchOnboarding, etc.)
 
+  @Post('product-request')
+  // Add @Public() if you have it and this route is public
+  async submitProductRequest(
+    @Body() body: ProductRequestDto,
+  ): Promise<{ message: string }> {
     console.log(
-      '📝 [POST /onboarding/save] Incoming save request for user:',
-      userId,
+      '📝 [POST /onboarding/product-request] Incoming product request:',
+      body,
     );
-    console.log('📦 Request Body:', body);
-
-    await this.onboardingService.saveProgress(userId, body);
-
-    console.log('✅ Onboarding progress saved successfully for user:', userId);
-    return { success: true };
-  }
-
-  @Get('fetch')
-  async fetchOnboarding(
-    @Req() req: RequestWithUser,
-  ): Promise<ReturnType<typeof this.onboardingService.fetchOnboarding>> {
-    const userId = req.user.id; // ✅ changed from `sub` to `id`
-    return await this.onboardingService.fetchOnboarding(userId);
-  }
-
-  @Get('status')
-  async getOnboardingStatus(
-    @Req() req: RequestWithUser,
-  ): Promise<GetOnboardingResponseDto> {
-    const userId = req.user?.id; // ✅ changed from `sub` to `id`
-
-    if (!userId) {
-      throw new NotFoundException('User not found');
+    try {
+      // ✅ CORRECT CALL: Delegates to the simplified OnboardingService
+      await this.onboardingService.saveProductRequest(
+        body.email,
+        body.niche,
+        body.audienceQuestions,
+      );
+      console.log('✅ Product request received successfully from:', body.email);
+      return { message: 'Product request received successfully!' };
+    } catch (error) {
+      console.error('❌ Error processing product request:', error);
+      throw new InternalServerErrorException(
+        'Failed to process your request. Please try again later.',
+      );
     }
-
-    const result: GetOnboardingResponseDto =
-      await this.onboardingService.getOnboardingData(userId);
-    return result;
-  }
-
-  @Get('generate')
-  async generateBrandKit(
-    @Req() req: RequestWithUser,
-  ): Promise<BrandKitResponseDto> {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new NotFoundException('User not found');
-    }
-
-    const result: BrandKitResponseDto =
-      await this.onboardingService.generateBrandKit(userId);
-    return result;
-  }
-
-  @Get('brand-kit')
-  async getBrandKit(@Req() req: RequestWithUser): Promise<BrandKitResponseDto> {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new NotFoundException('User not found');
-    }
-
-    // 🔧 Inject the DB instance directly
-    return await this.onboardingService.getBrandKitByUserId(userId, this.db);
   }
 }
