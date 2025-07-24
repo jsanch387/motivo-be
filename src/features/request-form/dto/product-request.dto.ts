@@ -13,4 +13,16 @@ export class ProductRequestDto {
   @IsString()
   @IsNotEmpty()
   audienceQuestions: string;
+
+  @IsString()
+  @IsNotEmpty()
+  audiencePlatformsAndSize: string; // New field
+
+  @IsString()
+  @IsNotEmpty()
+  contentType: string; // New field
+
+  @IsString()
+  @IsNotEmpty()
+  productIdea: string; // New field
 }

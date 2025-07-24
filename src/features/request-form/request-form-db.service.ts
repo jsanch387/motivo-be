@@ -1,6 +1,7 @@
 // src/request-forms/request-form-db.service.ts
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/common/database/database.service'; // Import your generic DatabaseService
+import { ProductRequestDto } from './dto/product-request.dto';
 
 @Injectable()
 export class RequestFormDbService {
@@ -8,22 +9,33 @@ export class RequestFormDbService {
 
   /**
    * Saves a new product request form submission to the 'request_forms' table.
-   * @param email The email address from the form.
-   * @param niche The creator's niche/content area.
-   * @param audienceQuestions Top questions the audience asks.
+   * @param payload The ProductRequestDto object containing all form data.
    * @returns The inserted row's ID and creation timestamp.
    */
   async createProductRequest(
-    email: string,
-    niche: string,
-    audienceQuestions: string,
+    payload: ProductRequestDto, // ✅ UPDATED: Accept the entire DTO object
   ): Promise<{ id: string; created_at: Date }> {
     const queryText = `
-      INSERT INTO public.request_forms (email, niche, audience_questions)
-      VALUES ($1, $2, $3)
+      INSERT INTO public.request_forms (
+        email,
+        niche,
+        audience_questions,
+        audience_platforms_and_size,
+        content_type,
+        product_idea,
+        created_at -- Only include created_at if you want to explicitly set it or return it
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, NOW()) -- NOW() for created_at
       RETURNING id, created_at;
     `;
-    const values = [email, niche, audienceQuestions];
+    const values = [
+      payload.email,
+      payload.niche,
+      payload.audienceQuestions,
+      payload.audiencePlatformsAndSize,
+      payload.contentType,
+      payload.productIdea,
+    ];
 
     console.log('💾 Inserting new product request into request_forms table...');
     const result = await this.db.queryOneOrNull<{

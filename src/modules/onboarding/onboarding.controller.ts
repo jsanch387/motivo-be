@@ -29,12 +29,8 @@ export class OnboardingController {
       body,
     );
     try {
-      // ✅ CORRECT CALL: Delegates to the simplified OnboardingService
-      await this.onboardingService.saveProductRequest(
-        body.email,
-        body.niche,
-        body.audienceQuestions,
-      );
+      // ✅ UPDATED CALL: Pass the entire DTO object
+      await this.onboardingService.saveProductRequest(body);
       console.log('✅ Product request received successfully from:', body.email);
       return { message: 'Product request received successfully!' };
     } catch (error) {

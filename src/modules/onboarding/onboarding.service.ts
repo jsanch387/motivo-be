@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/onboarding/onboarding.service.ts
 import { Injectable, InternalServerErrorException } from '@nestjs/common'; // Make sure Injectable is imported, and InternalServerErrorException if you want consistent error handling
+import { ProductRequestDto } from 'src/features/request-form/dto/product-request.dto';
 import { RequestFormDbService } from 'src/features/request-form/request-form-db.service';
 
 @Injectable() // Mark this class as an injectable service
@@ -8,18 +9,13 @@ export class OnboardingService {
   constructor(private readonly db: RequestFormDbService) {} // Inject DatabaseService
 
   async saveProductRequest(
-    email: string,
-    niche: string,
-    audienceQuestions: string,
+    payload: ProductRequestDto, // ✅ UPDATED: Accept the entire DTO object
   ): Promise<any> {
+    // Adjust return type as needed
     console.log('💾 Saving product request via OnboardingService...');
     try {
-      // ✅ CORRECT CALL: Using the specific method you added to DatabaseService
-      const savedRequest = await this.db.createProductRequest(
-        email,
-        niche,
-        audienceQuestions,
-      );
+      // ✅ CORRECT CALL: Pass the entire DTO object to the DB service
+      const savedRequest = await this.db.createProductRequest(payload);
       console.log('✅ Product request saved successfully:', savedRequest);
       return savedRequest;
     } catch (error) {
